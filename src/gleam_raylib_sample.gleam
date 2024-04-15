@@ -21,6 +21,8 @@ fn main_loop() {
     0xFF0000FF,
   )
 
+  rl.draw_circle_v(rl.Vector2(400, 500), 30.0, 0x0000FFFF)
+
   rl.draw_circle(200, 300, 30.0, 0xFF0000FF)
   rl.draw_circle(rl.get_mouse_x(), rl.get_mouse_y(), 30.0, 0x00FF00FF)
 

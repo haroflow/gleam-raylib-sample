@@ -4,3 +4,4 @@
 erl_crash.dump
 .vscode
 raylib_ffi.dll
+generate_bindings.log

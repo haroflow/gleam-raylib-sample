@@ -1,0 +1,1 @@
+g++ -fPIC -shared -o raylib_ffi.dll src\raylib_ffi.cpp -I"C:\Program Files\Erlang OTP\usr\include" -lraylib -lgdi32 -lwinmm

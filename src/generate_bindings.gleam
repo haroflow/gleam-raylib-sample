@@ -1,27 +1,22 @@
-import gleam/io
-import gleam/string
-import gleam/list
-import gleam/result
-import gleam/regex
+import gleam/bool
 import gleam/int
+import gleam/io
+import gleam/list
 import gleam/option.{type Option, Some}
+import gleam/regex
+import gleam/result
+import gleam/string
 import simplifile
-
-fn wanted_function(line: String) -> Bool {
-  [
-    "InitWindow", "SetTargetFPS", "WindowShouldClose", "CloseWindow",
-    "BeginDrawing", "EndDrawing", "ClearBackground", "DrawText", "DrawCircle",
-    "DrawCircleV", "GetMouseX", "GetMouseY",
-  ]
-  |> list.map(fn(name) { " " <> name <> "(" })
-  |> list.any(fn(function_name) { string.contains(line, function_name) })
-}
 
 type ReturnType {
   ReturnVoid
   ReturnInt
+  ReturnUnsignedInt
   ReturnBool
-  ReturnUnknown(name: String)
+  ReturnFloat
+  ReturnVector2
+  ReturnTexture2D
+  ReturnColor
 }
 
 type FunctionDefinition {
@@ -41,26 +36,44 @@ type ArgumentType {
   ArgVoid
   ArgInt
   ArgFloat
-  ArgUnknown
   ArgConstCharPointer
   ArgColor
   ArgVector2
+  ArgRectangle
+  ArgUnsignedInt
+  ArgBool
+  ArgTexture2D
 }
 
 pub fn main() {
-  let assert Ok(str) = simplifile.read("c_src/raylib.h")
-  let functions = get_api_functions(str)
+  let assert Ok(raylib_header) = simplifile.read("c_src/raylib.h")
+  let assert Ok(rlgl_header) = simplifile.read("c_src/rlgl.h")
+  let functions =
+    list.concat([
+      get_api_functions(raylib_header),
+      get_api_functions(rlgl_header),
+    ])
 
-  io.debug(functions)
+  // io.debug(functions)
+  let #(ok_functions, error_functions) =
+    functions
+    |> result.partition
 
-  let gleam_file = generate_ffi_gleam(functions)
+  let gleam_file = generate_ffi_gleam(ok_functions)
   let assert Ok(Nil) = simplifile.write("src/raylib.gleam", gleam_file)
 
-  let erl_file = generate_ffi_erl(functions)
+  let erl_file = generate_ffi_erl(ok_functions)
   let assert Ok(Nil) = simplifile.write("src/raylib_ffi.erl", erl_file)
 
-  let cpp_file = generate_ffi_cpp(functions)
+  let cpp_file = generate_ffi_cpp(ok_functions)
   let assert Ok(Nil) = simplifile.write("src/raylib_ffi.cpp", cpp_file)
+
+  let assert Ok(_) =
+    simplifile.write(
+      "generate_bindings.log",
+      error_functions
+        |> string.join("\n"),
+    )
 }
 
 fn generate_ffi_erl(functions: List(FunctionDefinition)) -> String {
@@ -109,7 +122,15 @@ fn generate_ffi_gleam(functions: List(FunctionDefinition)) -> String {
 import gleam/erlang/charlist
 
 pub type Vector2 {
-  Vector2(x: Int, y: Int)
+  Vector2(x: Float, y: Float)
+}
+
+pub type Rectangle {
+  Rectangle(x: Float, y: Float, width: Float, height: Float)
+}
+
+pub type Texture2D {
+  Texture2D(id: Int, width: Int, height: Int, mipmaps: Int, format: Int)
 }
 
 pub type Color = Int
@@ -146,6 +167,7 @@ fn generate_ffi_cpp(functions: List(FunctionDefinition)) -> String {
 #include <erl_nif.h>
 #include <iostream>
 #include <raylib.h>
+#include <rlgl.h>
 
 " <> function_defs <> "
 
@@ -162,33 +184,87 @@ fn arg_to_cpp(arg: ArgumentDefinition, index: Int) -> String {
   let var_name = "arg" <> int.to_string(index)
   case arg.arg_type {
     ArgInt -> "int " <> var_name <> ";
-      enif_get_int(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
+enif_get_int(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
+    ArgUnsignedInt -> "unsigned int " <> var_name <> ";
+enif_get_uint(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
     ArgConstCharPointer -> "char " <> var_name <> "[1024];
-    if (!enif_get_string(env, argv[" <> int.to_string(index) <> "], " <> var_name <> ", sizeof(" <> var_name <> "), ERL_NIF_UTF8))
-    {
-      return enif_make_badarg(env);
-    }"
+if (!enif_get_string(env, argv[" <> int.to_string(index) <> "], " <> var_name <> ", sizeof(" <> var_name <> "), ERL_NIF_UTF8))
+{
+return enif_make_badarg(env);
+}"
     ArgColor -> "unsigned int tmp_" <> var_name <> ";
-      enif_get_uint(env, argv[" <> int.to_string(index) <> "], &tmp_" <> var_name <> ");
-      Color " <> var_name <> " = GetColor(tmp_" <> var_name <> ");"
+enif_get_uint(env, argv[" <> int.to_string(index) <> "], &tmp_" <> var_name <> ");
+Color " <> var_name <> " = GetColor(tmp_" <> var_name <> ");"
     ArgFloat -> "double " <> var_name <> ";
-      enif_get_double(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
+enif_get_double(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
     ArgVoid -> ""
     ArgVector2 -> {
       let tmp_var_name = "tmp_arg" <> int.to_string(index)
       "
-    const ERL_NIF_TERM* " <> tmp_var_name <> ";
-    int arity" <> int.to_string(index) <> ";
-    enif_get_tuple(env, argv[0], &arity" <> int.to_string(index) <> ", &" <> tmp_var_name <> ");
-    int " <> tmp_var_name <> "_x;
-    enif_get_int(env, " <> tmp_var_name <> "[1], &" <> tmp_var_name <> "_x);
-    int " <> tmp_var_name <> "_y;
-    enif_get_int(env, " <> tmp_var_name <> "[2], &" <> tmp_var_name <> "_y);
-    Vector2 " <> var_name <> ";
-    " <> var_name <> ".x = " <> tmp_var_name <> "_x;
-    " <> var_name <> ".y = " <> tmp_var_name <> "_y;"
+const ERL_NIF_TERM* " <> tmp_var_name <> ";
+int arity" <> int.to_string(index) <> ";
+enif_get_tuple(env, argv[" <> int.to_string(index) <> "], &arity" <> int.to_string(
+        index,
+      ) <> ", &" <> tmp_var_name <> ");
+double " <> tmp_var_name <> "_x;
+enif_get_double(env, " <> tmp_var_name <> "[1], &" <> tmp_var_name <> "_x);
+double " <> tmp_var_name <> "_y;
+enif_get_double(env, " <> tmp_var_name <> "[2], &" <> tmp_var_name <> "_y);
+Vector2 " <> var_name <> ";
+" <> var_name <> ".x = (float)" <> tmp_var_name <> "_x;
+" <> var_name <> ".y = (float)" <> tmp_var_name <> "_y;"
     }
-    ArgUnknown -> panic as "ArgUnknown not implemented"
+    ArgRectangle -> {
+      let tmp_var_name = "tmp_arg" <> int.to_string(index)
+      "
+const ERL_NIF_TERM* " <> tmp_var_name <> ";
+int arity" <> int.to_string(index) <> ";
+enif_get_tuple(env, argv[" <> int.to_string(index) <> "], &arity" <> int.to_string(
+        index,
+      ) <> ", &" <> tmp_var_name <> ");
+double " <> tmp_var_name <> "_x;
+enif_get_double(env, " <> tmp_var_name <> "[1], &" <> tmp_var_name <> "_x);
+double " <> tmp_var_name <> "_y;
+enif_get_double(env, " <> tmp_var_name <> "[2], &" <> tmp_var_name <> "_y);
+double " <> tmp_var_name <> "_width;
+enif_get_double(env, " <> tmp_var_name <> "[3], &" <> tmp_var_name <> "_width);
+double " <> tmp_var_name <> "_height;
+enif_get_double(env, " <> tmp_var_name <> "[4], &" <> tmp_var_name <> "_height);
+Rectangle " <> var_name <> ";
+" <> var_name <> ".x = (float)" <> tmp_var_name <> "_x;
+" <> var_name <> ".y = (float)" <> tmp_var_name <> "_y;
+" <> var_name <> ".width = (float)" <> tmp_var_name <> "_width;
+" <> var_name <> ".height = (float)" <> tmp_var_name <> "_height;"
+    }
+    ArgBool -> {
+      "unsigned int " <> var_name <> ";
+enif_get_uint(env, argv[" <> int.to_string(index) <> "], &" <> var_name <> ");"
+    }
+    ArgTexture2D -> {
+      let tmp_var_name = "tmp_arg" <> int.to_string(index)
+      "
+const ERL_NIF_TERM* " <> tmp_var_name <> ";
+int arity" <> int.to_string(index) <> ";
+enif_get_tuple(env, argv[" <> int.to_string(index) <> "], &arity" <> int.to_string(
+        index,
+      ) <> ", &" <> tmp_var_name <> ");
+unsigned int " <> tmp_var_name <> "_id;
+enif_get_uint(env, " <> tmp_var_name <> "[1], &" <> tmp_var_name <> "_id);
+int " <> tmp_var_name <> "_width;
+enif_get_int(env, " <> tmp_var_name <> "[2], &" <> tmp_var_name <> "_width);
+int " <> tmp_var_name <> "_height;
+enif_get_int(env, " <> tmp_var_name <> "[3], &" <> tmp_var_name <> "_height);
+int " <> tmp_var_name <> "_mipmaps;
+enif_get_int(env, " <> tmp_var_name <> "[4], &" <> tmp_var_name <> "_mipmaps);
+int " <> tmp_var_name <> "_format;
+enif_get_int(env, " <> tmp_var_name <> "[5], &" <> tmp_var_name <> "_format);
+Texture2D " <> var_name <> ";
+" <> var_name <> ".id = " <> tmp_var_name <> "_id;
+" <> var_name <> ".width = " <> tmp_var_name <> "_width;
+" <> var_name <> ".height = " <> tmp_var_name <> "_height;
+" <> var_name <> ".mipmaps = " <> tmp_var_name <> "_mipmaps;
+" <> var_name <> ".format = " <> tmp_var_name <> "_format;"
+    }
   }
 }
 
@@ -220,7 +296,30 @@ fn cpp_function_def(function: FunctionDefinition) -> String {
       <> "unsigned int result = "
       <> function_call
       <> "\nreturn enif_make_uint(env, result);"
-    ReturnUnknown(err) -> panic as err
+    ReturnUnsignedInt ->
+      args
+      <> "unsigned int result = "
+      <> function_call
+      <> "\nreturn enif_make_uint(env, result);"
+    ReturnFloat ->
+      args
+      <> "float result = "
+      <> function_call
+      <> "\nreturn enif_make_double(env, (double)result);"
+    ReturnVector2 -> args <> "Vector2 v = " <> function_call <> "
+return enif_make_tuple3(env, enif_make_double(env, 0), enif_make_double(env, (double)v.x), enif_make_double(env, (double)v.y));"
+    ReturnTexture2D -> args <> "Texture2D texture = " <> function_call <> "
+return enif_make_tuple6(
+  env,
+  enif_make_int(env, 0),
+  enif_make_uint(env, texture.id),
+  enif_make_int(env, texture.width),
+  enif_make_int(env, texture.height),
+  enif_make_int(env, texture.mipmaps),
+  enif_make_int(env, texture.format)
+);"
+    ReturnColor -> args <> "Color color = " <> function_call <> "
+return enif_make_int(env, ColorToInt(color));"
   }
 
   "static ERL_NIF_TERM "
@@ -230,24 +329,31 @@ fn cpp_function_def(function: FunctionDefinition) -> String {
   <> "\n}"
 }
 
-fn arg_type_to_string(arg: ArgumentType) -> String {
+fn arg_type_to_gleam_type(arg: ArgumentType) -> String {
   case arg {
     ArgInt -> "Int"
     ArgConstCharPointer -> "charlist.Charlist"
-    ArgUnknown -> "Nil"
     ArgVoid -> "Nil"
     ArgFloat -> "Float"
     ArgColor -> "Color"
     ArgVector2 -> "Vector2"
+    ArgRectangle -> "Rectangle"
+    ArgUnsignedInt -> "Int"
+    ArgBool -> "Bool"
+    ArgTexture2D -> "Texture2D"
   }
 }
 
-fn return_type_to_string(t: ReturnType) -> Result(String, String) {
+fn return_type_to_gleam_type(t: ReturnType) -> Result(String, String) {
   case t {
     ReturnVoid -> Ok("Nil")
     ReturnInt -> Ok("Int")
-    ReturnBool -> Ok("bool")
-    ReturnUnknown(err) -> Ok(err)
+    ReturnBool -> Ok("Int")
+    ReturnUnsignedInt -> Ok("Int")
+    ReturnFloat -> Ok("Float")
+    ReturnVector2 -> Ok("Vector2")
+    ReturnTexture2D -> Ok("Texture2D")
+    ReturnColor -> Ok("Color")
   }
 }
 
@@ -258,10 +364,10 @@ fn function_to_gleam_definition(function: FunctionDefinition) -> String {
     |> list.map(fn(arg) {
       camel_case_to_snake_case(arg.name)
       <> ": "
-      <> arg_type_to_string(arg.arg_type)
+      <> arg_type_to_gleam_type(arg.arg_type)
     })
     |> string.join(", ")
-  let return_type = case return_type_to_string(function.return_type) {
+  let return_type = case return_type_to_gleam_type(function.return_type) {
     Ok(t) -> t
     Error(msg) -> {
       io.debug(function)
@@ -310,18 +416,28 @@ fn function_to_erlang_signature(function: FunctionDefinition) -> String {
   camel_case_to_snake_case(function.name) <> "/" <> int.to_string(function.argc)
 }
 
-fn get_api_functions(whole_file: String) -> List(FunctionDefinition) {
+fn get_api_functions(
+  whole_file: String,
+) -> List(Result(FunctionDefinition, String)) {
   let lines =
     whole_file
     |> string.split("\n")
     |> list.filter(fn(line) { string.starts_with(line, "RLAPI") })
     |> list.map(cleanup_line)
     |> list.filter(fn(line) { !string.is_empty(line) })
+    |> list.filter(fn(line) {
+      // FIXME some functions are inside #ifdefs
+      !string.contains(line, "rlEnableStatePointer")
+      && !string.contains(line, "rlDisableStatePointer")
+    })
 
   let functions =
     lines
-    |> list.filter(wanted_function)
-    |> list.map(line_to_function_definition)
+    |> list.map(fn(line) {
+      line
+      |> line_to_function_definition
+      |> result.map_error(fn(err) { line <> "\n\t" <> err })
+    })
 
   functions
 }
@@ -334,19 +450,15 @@ fn cleanup_line(line: String) -> String {
   |> string.trim
 }
 
-fn line_to_function_definition(line: String) -> FunctionDefinition {
-  let assert Ok(rgx) = regex.from_string("RLAPI (.*) (.*)\\((.*)\\)")
+fn line_to_function_definition(
+  line: String,
+) -> Result(FunctionDefinition, String) {
+  let assert Ok(rgx) = regex.from_string("RLAPI (.*)[ \\*](\\w*)\\((.*)\\)")
   let assert [match] = regex.scan(rgx, line)
   let assert [Some(return_type), Some(function_name), Some(args)] =
     match.submatches
 
-  let return_type = case string_to_return_type(return_type) {
-    Ok(t) -> t
-    Error(err) ->
-      panic as {
-        "Error converting line [" <> line <> "] error: [" <> err <> "]"
-      }
-  }
+  use return_type <- result.try(string_to_return_type(return_type))
 
   let argv = case args {
     "void" -> []
@@ -356,11 +468,13 @@ fn line_to_function_definition(line: String) -> FunctionDefinition {
       |> list.map(arg_str_to_arg_definition)
   }
 
+  use valid_args <- result.try(result.all(argv))
+
   let argc =
-    argv
+    valid_args
     |> list.length()
 
-  FunctionDefinition(function_name, return_type, argc, argv)
+  Ok(FunctionDefinition(function_name, return_type, argc, valid_args))
 }
 
 fn string_to_return_type(str: String) -> Result(ReturnType, String) {
@@ -368,41 +482,58 @@ fn string_to_return_type(str: String) -> Result(ReturnType, String) {
     "void" -> Ok(ReturnVoid)
     "int" -> Ok(ReturnInt)
     "bool" -> Ok(ReturnBool)
+    "unsigned int" -> Ok(ReturnUnsignedInt)
+    "float" -> Ok(ReturnFloat)
+    "Vector2" -> Ok(ReturnVector2)
+    "Texture2D" -> Ok(ReturnTexture2D)
+    "Color" -> Ok(ReturnColor)
     other -> Error("Return type '" <> other <> "' not implemented.")
   }
 }
 
-fn arg_str_to_arg_definition(arg: String) -> ArgumentDefinition {
+fn arg_str_to_arg_definition(arg: String) -> Result(ArgumentDefinition, String) {
   let arg_type =
     arg
     |> string.trim
     |> detect_argument_type
 
-  let arg_name =
-    arg
-    |> string.trim
-    |> string.split(" ")
-    |> list.last
-    |> result.unwrap("unnamed_arg")
-    |> string.replace("*", "")
+  case arg_type {
+    Ok(arg_type) -> {
+      let arg_name =
+        arg
+        |> string.trim
+        |> string.split(" ")
+        |> list.last
+        |> result.unwrap("unnamed_arg")
+        |> string.replace("*", "")
 
-  ArgumentDefinition(arg_name, arg_type)
+      let arg_name = case arg_name == "type" {
+        True -> "a_type"
+        False -> arg_name
+      }
+
+      Ok(ArgumentDefinition(arg_name, arg_type))
+    }
+    Error(msg) -> Error(msg)
+  }
 }
 
-fn detect_argument_type(str: String) -> ArgumentType {
-  let t =
-    [
+fn detect_argument_type(str: String) -> Result(ArgumentType, String) {
+  case string.contains(str, "*") {
+    True -> [#("const char *", ArgConstCharPointer)]
+    False -> [
       #("void", ArgVoid),
-      #("const char *", ArgConstCharPointer),
       #("int", ArgInt),
       #("float", ArgFloat),
       #("Color", ArgColor),
       #("Vector2", ArgVector2),
+      #("Rectangle", ArgRectangle),
+      #("unsigned int", ArgUnsignedInt),
+      #("bool", ArgBool),
+      #("Texture2D", ArgTexture2D),
     ]
-    |> list.find(fn(t) { string.starts_with(str, t.0) })
-
-  case t {
-    Ok(t) -> t.1
-    Error(_) -> panic as { "Unknown argument type [" <> str <> "]" }
   }
+  |> list.find(fn(t) { string.starts_with(str, t.0) })
+  |> result.map(fn(t) { t.1 })
+  |> result.map_error(fn(_) { "Unknown argument type [" <> str <> "]" })
 }

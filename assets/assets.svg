@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   sodipodi:docname="assets.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showguides="true"
+     inkscape:export-bgcolor="#ffffff00"
+     inkscape:zoom="1.3422675"
+     inkscape:cx="216.79733"
+     inkscape:cy="162.03924"
+     inkscape:window-width="1920"
+     inkscape:window-height="1027"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1">
+    <sodipodi:guide
+       position="16.37745,325.92188"
+       orientation="0,-1"
+       id="guide6"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="11.499061,301.46024"
+       orientation="1,0"
+       id="guide7"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="7.3872753,304.73574"
+       orientation="0,-1"
+       id="guide8"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="32.685209,303.62068"
+       orientation="1,0"
+       id="guide9"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="34.706256,317.69832"
+       orientation="1,0"
+       id="guide10"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="55.892403,316.65295"
+       orientation="1,0"
+       id="guide11"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Camada 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#000000;stroke-width:0.146083"
+       id="rect4"
+       width="59.289593"
+       height="65.051521"
+       x="64.483574"
+       y="6.0537181" />
+    <path
+       style="fill:#000000;stroke:#ffffff;stroke-width:1.265;stroke-dasharray:none;stroke-opacity:1"
+       d="m 88.928371,29.515464 4.828645,-6.482292 12.964584,7.14375 -5.29167,5.55625 3.83646,8.466667 -11.641665,5.820833 -5.159375,-5.688542 -9.525,-0.661458 3.175,-10.054167 z"
+       id="path5"
+       sodipodi:nodetypes="cccccccccc"
+       inkscape:export-filename="asteroid.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:none;stroke:none;stroke-width:1.27374;stroke-dasharray:none;stroke-opacity:1"
+       id="rect5"
+       width="21.166666"
+       height="21.166666"
+       x="11.58"
+       y="-28.94944"
+       inkscape:export-filename="spaceship.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <path
+       id="path1"
+       style="fill:#ffffff;stroke-width:0.231623"
+       inkscape:transform-center-y="-2.8552798"
+       d="m 22.163334,-27.461112 5.539724,7.598716 4.351253,9.532961 -9.90785,-2.770611 -9.874106,2.77061 4.223362,-9.50372 z"
+       sodipodi:nodetypes="ccccccc"
+       inkscape:export-filename="spaceship.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:none;stroke:none;stroke-width:1.27374;stroke-dasharray:none;stroke-opacity:1"
+       id="rect6"
+       width="21.166666"
+       height="21.166666"
+       x="34.739552"
+       y="-28.94944"
+       inkscape:export-filename="spaceship_thruster.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <path
+       id="path6"
+       style="fill:#ffffff;stroke-width:0.231623"
+       inkscape:transform-center-y="-2.8552798"
+       d="m 45.322886,-27.461112 5.539724,7.598716 4.351253,9.532961 -9.90785,-2.770611 -9.874106,2.77061 4.223362,-9.50372 z"
+       sodipodi:nodetypes="ccccccc"
+       inkscape:export-filename="spaceship.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <path
+       style="fill:none;stroke:#ffffff;stroke-width:0.764463;stroke-dasharray:none;stroke-opacity:1"
+       d="m 41.740944,-13.328179 0.771616,2.811188 1.003098,-1.423388 0.540129,1.672481 0.694453,-1.209879 0.540132,1.8504007 0.694453,-1.7792317 0.578711,0.925203 0.385808,-1.316634 0.925938,1.636894 0.771614,-3.843142"
+       id="path4" />
+  </g>
+</svg>
